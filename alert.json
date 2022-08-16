@@ -1,0 +1,35 @@
+{
+  "receiver":{
+    "apiVersion":"notification.kubesphere.io/v2beta2",
+    "kind":"Receiver",
+    "metadata":{
+      "name":"resources-receiver",
+      "labels":{
+        "app":"notification-manager",
+        "type":"global"
+      }
+    },
+    "spec":{
+      "feishu":{
+        "chatbot":{
+          "webhook":{
+            "value": ""
+          }
+        }
+      }
+    }
+  },
+  "alert": {
+    "status": "notification",
+    "alerts": [
+      {
+        "status": "notification",
+        "labels": {
+        },
+        "annotations": {
+          "message": ""
+        }
+      }
+    ]
+  }
+}
