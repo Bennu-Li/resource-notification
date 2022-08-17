@@ -20,14 +20,14 @@
     }
   },
   "alert": {
-    "status": "notification",
+    "status": "",
     "alerts": [
       {
-        "status": "notification",
+        "status": "cluster info",
         "labels": {
         },
         "annotations": {
-          "message": ""
+          "message": "Cluster Resource Usage Details"
         }
       }
     ]
