@@ -22,16 +22,18 @@ var prometheusAddress string = os.Getenv("PrometheusAddress")
 var notificationServer string = os.Getenv("NotificationServer")
 
 type resourceUsageDetails struct {
-	ClusterName   string
-	CPUReauest    string
-	CPUUsage      string
-	MemoryRequest string
-	MemoryUsage   string
-	InstanceTotal string
-	Creating      string
-	Deleting      string
-	Healthy       string
-	Unhealthy     string
+	ClusterName        string
+	CPUReauest         string
+	CPUReauest8cu      string
+	CPUUsage           string
+	MemoryRequest      string
+	MemoryRequest8cu   string
+	MemoryUsage        string
+	InstanceTotal      string
+	Creating           string
+	Deleting           string
+	Healthy            string
+	Unhealthy          string
 }
 
 func main() {
@@ -42,6 +44,15 @@ func main() {
 		fmt.Printf("Error creating client: %v\n", err)
 		os.Exit(1)
 	}
+
+	
+	// metricName := ""
+	// requestResult, _ := getQuery(client, memoryRequest8cumetric)
+	// fmt.Println(requestResult)
+
+	// resource := make(map[string]*resourceUsageDetails)
+	// getResource(CPURequest8cumetric, client, resource, "CPUReauest8cu")
+	// fmt.Println(resource["uat-test"])
 
 	err = sendResourceDetails(client, notificationServer)
 	if err != nil {
@@ -60,9 +71,24 @@ func sendResourceDetails(client api.Client, notificationServer string) error {
 		fmt.Println(err)
 	}
 
+
 	// CPU Usage
 	cpuUsageMetric := "1- sum(avg by (cluster, mode) (rate(node_cpu_seconds_total{job=\"node-exporter\", mode=~\"idle|steal\"}[1m]))) by (cluster)"
 	err = getResource(cpuUsageMetric, client, resource, "CPUUsage")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// CPU Request for 8cu
+	cpuRequest8cumetric := "sum(kube_pod_container_resource_requests{resource=\"cpu\"} * on (node) group_left(label_node_role_milvus_8cu_standalone) kube_node_labels {label_node_role_milvus_8cu_standalone=\"true\"}) by(cluster) / sum(kube_node_status_allocatable{resource=\"cpu\"} * on(node) group_left(label_node_role_milvus_8cu_standalone) kube_node_labels {label_node_role_milvus_8cu_standalone=\"true\"}) by (cluster)"
+	err = getResource(cpuRequest8cumetric, client, resource, "CPUReauest8cu")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Memory Request for 8cu
+	memoryRequest8cumetric := "sum(kube_pod_container_resource_requests{resource=\"memory\"} * on (node) group_left(label_node_role_milvus_8cu_standalone) kube_node_labels {label_node_role_milvus_8cu_standalone=\"true\"}) by(cluster) / sum(kube_node_status_allocatable{resource=\"memory\"} * on(node) group_left(label_node_role_milvus_8cu_standalone) kube_node_labels {label_node_role_milvus_8cu_standalone=\"true\"}) by (cluster)"
+	err = getResource(memoryRequest8cumetric, client, resource, "MemoryRequest8cu")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -95,8 +121,8 @@ func sendResourceDetails(client api.Client, notificationServer string) error {
 		fmt.Println(err)
 	}
 
-	for clusterName, resourceDetail := range resource {
-		reader, err := resourceDetail.getRequestBody()
+	for clusterName, r := range resource {
+		reader, err := r.getRequestBody()
 		if err != nil {
 			return err
 		}
@@ -159,7 +185,7 @@ func getMilvusStatusNum(metricName string, client api.Client, resource map[strin
 		cluster := string(result.Metric["cluster"])
 		status := string(result.Metric["status"])
 		value := fmt.Sprintf("%.0f", result.Value)
-
+		
 		if _, ok := resource[cluster]; !ok {
 			resource[cluster] = newResourceUsageDetails(cluster)
 		}
@@ -190,9 +216,12 @@ func (r *resourceUsageDetails) getRequestBody() (io.Reader, error) {
 	labels["deleting"] = r.Deleting
 	labels["healthy"] = r.Healthy
 	labels["unhealthy"] = r.Unhealthy
+	labels["8cu CPU request"] = r.CPUReauest8cu
+	labels["8cu memory request"] = r.MemoryRequest8cu
 	labels["Time"] = fmt.Sprintf(time.Now().Format("2006-01-02 15:04:05"))
 
 	requestBody["alert"].(map[string]interface{})["alerts"].([]interface{})[0].(map[string]interface{})["status"] = r.ClusterName
+
 
 	// title := "Cluster Resource Usage Details"
 	// alert["annotations"].(map[string]interface{})["message"] = title
