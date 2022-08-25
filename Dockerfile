@@ -4,8 +4,7 @@ COPY . .
 RUN make build
 
 FROM alpine 
-WORKDIR /
-COPY --from=builder /app/notification /
-COPY --from=builder /app/alert.json /
-RUN chmod +x /notification
-#CMD ["/notification"]
+WORKDIR /app
+RUN apk update && apk add tzdata
+COPY --from=builder /app/notification /app
+COPY --from=builder /app/alert.json /app
