@@ -11,6 +11,7 @@
     },
     "spec":{
       "feishu":{
+        "tmplType": "text",
         "chatbot":{
           "webhook":{
             "value": ""
