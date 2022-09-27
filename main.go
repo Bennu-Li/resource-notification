@@ -30,6 +30,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	// testNewResource(client)
+
 	err = sendResource(client, notificationServer)
 	if err != nil {
 		fmt.Println(err)
@@ -173,6 +175,27 @@ func getResourceDetail(metricName string, client api.Client, resource map[string
 	return nil
 }
 
+
+func getGroupNodeInstance(client api.Client, resource map[string]map[string]string, keySort map[string][]string, label string, field string) error {
+	for clusterName, _ := range resource {
+		// if _, ok := resource[clusterName]; ok {
+		// metricName := "count(kube_node_labels{cluster="milvus-us-west-2-01", label_eks_amazonaws_com_nodegroup="infra-2c-8g-200g"})"
+		metricName := fmt.Sprintf("count(kube_node_labels{cluster=\"%s\", label_eks_amazonaws_com_nodegroup=\"%s\"})", clusterName, label)
+		requestResult, err := getQuery(client, metricName)
+		if err != nil {
+			fmt.Println(err)
+			// return nil
+		}
+		if len(requestResult) > 0 {
+			value := fmt.Sprintf("%.0f", requestResult[0].Value)
+			resource[clusterName][field] = value
+			keySort[clusterName] = append(keySort[clusterName], field)
+		}
+	}
+	return nil
+}
+
+
 func getResourceGroupByNode(client api.Client, resource map[string]map[string]string, keySort map[string][]string) error {
 	metricName := "sum(kube_node_labels) by (label_eks_amazonaws_com_nodegroup)"
 	requestResult, err := getQuery(client, metricName)
@@ -190,6 +213,11 @@ func getResourceGroupByNode(client api.Client, resource map[string]map[string]st
 	fmt.Println(labels)
 
 	for _, label := range labels {
+		// Group node instance
+		_ = getGroupNodeInstance(client, resource, keySort, label, "NodeCount_"+label)
+		// if err != nil {
+		// 	fmt.Println(err)
+		// }
 
 		// group cpu usage
 		groupMetricName := "sum(sum(1 - rate(node_cpu_seconds_total{mode=~\"idle\"}[1m]) * on(namespace, pod) group_left(node) node_namespace_pod:kube_pod_info:{}) by (cluster, node) * on(node) group_left(label_eks_amazonaws_com_nodegroup) kube_node_labels{label_eks_amazonaws_com_nodegroup=\"" + label + "\"}) by(cluster) /sum(kube_node_status_allocatable{resource=\"cpu\"} * on(node) group_left(label_eks_amazonaws_com_nodegroup) kube_node_labels {label_eks_amazonaws_com_nodegroup=\"" + label + "\"}) by (cluster)"
@@ -288,14 +316,14 @@ func requestBody(r map[string]string, cluster string, sortKey []string) (io.Read
 			if i == 11 {
 				message = fmt.Sprintf("%s\n\n Node Group:", message)
 			}
-			if 0 == (i-11)%6 {
+			if 0 == (i-11)%7 {
 				message = fmt.Sprintf("%s\n    %s:", message, keyName[1])
 			}
 			message = fmt.Sprintf("%s\n      %s: %s", message, keyName[0], r[key])
 		}
 	}
 
-	fmt.Println(message)
+	// fmt.Println(message)
 
 	requestBody["alert"].(map[string]interface{})["alerts"].([]interface{})[0].(map[string]interface{})["annotations"].(map[string]interface{})["message"] = message + "\n"
 
@@ -340,7 +368,10 @@ func post(url string, contentType string, jsonFile io.Reader) error {
 
 func testNewResource(client api.Client) {
 	// Query
-	metricName := "sum(namespace_cpu:kube_pod_container_resource_requests:sum) by (cluster) / sum(kube_node_status_allocatable{resource=\"cpu\"}) by (cluster)"
+	// metricName := "sum(namespace_cpu:kube_pod_container_resource_requests:sum) by (cluster) / sum(kube_node_status_allocatable{resource=\"cpu\"}) by (cluster)"
+	metricName := "count(kube_node_labels{cluster=\"uat-test\"}) by (label_eks_amazonaws_com_nodegroup)"
+	// metricName := "count(kube_node_labels{cluster=\"uat-test\", label_eks_amazonaws_com_nodegroup=\"milvus-diskann-8c-32g\"})"
+	// metricName := "sum(milvus_total_count) by (cluster)"
 	requestResult, err := getQuery(client, metricName)
 	if err != nil {
 		fmt.Println(err)
@@ -348,26 +379,26 @@ func testNewResource(client api.Client) {
 	}
 	fmt.Println(requestResult)
 
-	// Get Resource
-	resource := make(map[string]map[string]string)
-	keySort := make(map[string][]string)
-	err = getResourceDetail(metricName, client, resource, keySort, "CPUReauest")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(resource)
+	// // Get Resource
+	// resource := make(map[string]map[string]string)
+	// keySort := make(map[string][]string)
+	// err = getResourceDetail(metricName, client, resource, keySort, "CPUReauest")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// fmt.Println(resource)
 
-	// Send
-	for clusterName, r := range resource {
-		reader, err := requestBody(r, clusterName, keySort[clusterName])
-		if err != nil {
-			return
-		}
-		fmt.Println("send resource details for cluster: ", clusterName)
-		err = post(notificationServer, "application/json", reader)
-		if err != nil {
-			fmt.Println(err)
-		}
-	}
+	// // Send
+	// for clusterName, r := range resource {
+	// 	reader, err := requestBody(r, clusterName, keySort[clusterName])
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	fmt.Println("send resource details for cluster: ", clusterName)
+	// 	err = post(notificationServer, "application/json", reader)
+	// 	if err != nil {
+	// 		fmt.Println(err)
+	// 	}
+	// }
 }
